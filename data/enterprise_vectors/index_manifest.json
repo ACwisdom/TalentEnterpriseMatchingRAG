@@ -1,0 +1,7 @@
+{
+  "excel_path": "D:\\TalentEnterpriseMatchingRAG\\data\\enterprise_db.xlsx",
+  "mtime": 1778122985.188452,
+  "size": 2920179,
+  "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+  "num_rows": 3822
+}

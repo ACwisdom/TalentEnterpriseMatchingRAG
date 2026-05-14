@@ -1,0 +1,33 @@
+# Fly.io Machines / fly.toml — 部署前请将 `app` 改为全局唯一名称（见 docs/deploy-public.md）。
+# primary_region 默认 sin（新加坡）；可改为 nrt（东京）等与 Volume 相同的区域。
+
+app = "talent-enterprise-matching-rag"
+primary_region = "sin"
+kill_signal = "SIGTERM"
+kill_timeout = "30s"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[http_service.checks]]
+  grace_period = "45s"
+  interval = "20s"
+  method = "GET"
+  timeout = "5s"
+  path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "2gb"
+
+# Chroma 持久化：仅挂载向量目录，勿挂载整个 /app/data，以免遮盖镜像内的 data/default 与 enterprise_db.xlsx。
+[[mounts]]
+  source = "enterprise_vectors_data"
+  destination = "/app/data/enterprise_vectors"

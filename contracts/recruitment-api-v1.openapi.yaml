@@ -1,0 +1,295 @@
+openapi: 3.1.0
+info:
+  title: Recruitment API
+  version: "1.0.0"
+  description: >
+    Hand-maintained contract for `java/recruitment-api` v1 (`/api/v1`).
+    Aligned with Springdoc at `/v3/api-docs` when the service is running.
+servers:
+  - url: http://127.0.0.1:8080
+paths:
+  /api/v1/candidates/search:
+    get:
+      summary: Search candidates
+      parameters:
+        - in: query
+          name: name
+          schema: { type: string }
+        - in: query
+          name: email
+          schema: { type: string }
+        - in: query
+          name: skill
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, default: 0 }
+        - in: query
+          name: size
+          schema: { type: integer, default: 20 }
+      responses:
+        "200":
+          description: Paged candidates
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PagedCandidateResponse" }
+  /api/v1/jobs/search:
+    get:
+      summary: Search jobs
+      parameters:
+        - in: query
+          name: companyId
+          schema: { type: integer, format: int64 }
+        - in: query
+          name: title
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, default: 0 }
+        - in: query
+          name: size
+          schema: { type: integer, default: 20 }
+      responses:
+        "200":
+          description: Paged jobs
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PagedJobResponse" }
+  /api/v1/recommendations:
+    post:
+      summary: Create recommendation (unique job_id + candidate_id)
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateRecommendationRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecommendationDto" }
+        "409":
+          description: Duplicate job/candidate pair
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+  /api/v1/recommendations/{id}/status:
+    patch:
+      summary: Update recommendation status (state machine)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PatchRecommendationStatusRequest" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecommendationDto" }
+        "422":
+          description: Invalid status transition
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+  /api/v1/recommendations/{id}/communications:
+    post:
+      summary: Add communication on a recommendation
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCommunicationRequest" }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommunicationDto" }
+  /api/v1/messages/outbound:
+    post:
+      summary: Queue outbound message (stub)
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OutboundMessageRequest" }
+      responses:
+        "202":
+          description: Accepted / queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OutboundQueuedResponse" }
+  /api/v1/reminders:
+    post:
+      summary: Create reminder
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateReminderRequest" }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReminderDto" }
+components:
+  parameters:
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: false
+      schema: { type: string }
+    CorrelationId:
+      in: header
+      name: X-Correlation-Id
+      required: false
+      schema: { type: string }
+  schemas:
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: {}
+    PageInfo:
+      type: object
+      properties:
+        number: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+    PagedCandidateResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/CandidateDto" }
+        page: { $ref: "#/components/schemas/PageInfo" }
+    PagedJobResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/JobDto" }
+        page: { $ref: "#/components/schemas/PageInfo" }
+    CandidateDto:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        phone: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        skills: { type: string, nullable: true }
+        expYears: { type: integer, nullable: true }
+        city: { type: string, nullable: true }
+        status: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time, nullable: true }
+    JobDto:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        companyId: { type: integer, format: int64 }
+        companyName: { type: string }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        city: { type: string, nullable: true }
+        status: { type: string }
+        createdAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    RecommendationDto:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        jobId: { type: integer, format: int64 }
+        candidateId: { type: integer, format: int64 }
+        matchScore: { type: number, format: double, nullable: true }
+        scoreModel: { type: string, nullable: true }
+        reason: { type: string, nullable: true }
+        status: { type: string, description: "已推荐 | 已读 | 有意向 | 面试 | offer | 入职 | 不合适" }
+        createdAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    CreateRecommendationRequest:
+      type: object
+      required: [jobId, candidateId]
+      properties:
+        jobId: { type: integer, format: int64 }
+        candidateId: { type: integer, format: int64 }
+        reason: { type: string, nullable: true }
+        matchScore: { type: number, format: double, nullable: true }
+        scoreModel: { type: string, nullable: true }
+    PatchRecommendationStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+        note: { type: string, nullable: true }
+    CommunicationDto:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        recommendationId: { type: integer, format: int64 }
+        channel: { type: string }
+        direction: { type: string }
+        body: { type: string }
+        createdAt: { type: string, format: date-time, nullable: true }
+    CreateCommunicationRequest:
+      type: object
+      required: [channel, direction, body]
+      properties:
+        channel: { type: string }
+        direction: { type: string }
+        body: { type: string }
+    OutboundMessageRequest:
+      type: object
+      required: [body]
+      properties:
+        to: { type: string, nullable: true }
+        body: { type: string }
+    OutboundQueuedResponse:
+      type: object
+      properties:
+        deliveryId: { type: string }
+        status: { type: string, example: QUEUED }
+    ReminderDto:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        recommendationId: { type: integer, format: int64, nullable: true }
+        message: { type: string }
+        dueAt: { type: string, format: date-time }
+        channel: { type: string, nullable: true }
+        status: { type: string }
+        createdAt: { type: string, format: date-time, nullable: true }
+    CreateReminderRequest:
+      type: object
+      required: [dueAt, message]
+      properties:
+        recommendationId: { type: integer, format: int64, nullable: true }
+        dueAt: { type: string, format: date-time }
+        message: { type: string }

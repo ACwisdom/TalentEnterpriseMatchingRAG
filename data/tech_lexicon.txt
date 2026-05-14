@@ -1,0 +1,19 @@
+# 每行一词，简历中出现则参与第一层关键词抽取（与内置词表并集）
+# 编译器 / 控制 / 大模型等
+Compiler
+MPC
+LLM
+RAG
+GPU
+CUDA
+LLVM
+ROS
+SLAM
+FPGA
+ASIC
+EDA
+TCAD
+DevOps
+Kubernetes
+PyTorch
+TensorFlow

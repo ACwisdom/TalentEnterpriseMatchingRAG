@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>人才-企业匹配</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color: #1a1a1a; background: #f4f5f7; }
+    body { max-width: 52rem; margin: 0 auto; padding: 1.5rem; }
+    h1 { font-size: 1.35rem; font-weight: 600; }
+    fieldset { border: 1px solid #cfd3dc; border-radius: 8px; padding: 1rem 1.1rem; margin: 0 0 1rem; background: #fff; }
+    legend { padding: 0 0.35rem; font-weight: 600; }
+    label { display: block; margin: 0.5rem 0 0.2rem; font-size: 0.9rem; }
+    input[type="text"], input[type="number"], input[type="password"] { width: 100%; max-width: 22rem; padding: 0.45rem 0.5rem; border: 1px solid #bbb; border-radius: 4px; box-sizing: border-box; }
+    input[type="file"] { margin-top: 0.25rem; }
+    .row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-top: 0.5rem; }
+    .row label { display: flex; align-items: center; gap: 0.35rem; margin: 0; font-weight: normal; }
+    button { margin-top: 0.75rem; padding: 0.55rem 1.1rem; border-radius: 6px; border: none; background: #2563eb; color: #fff; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    #status { margin: 0.75rem 0; font-size: 0.9rem; color: #444; min-height: 1.2em; }
+    #status.err { color: #b91c1c; }
+    #report { white-space: pre-wrap; background: #fff; border: 1px solid #cfd3dc; border-radius: 8px; padding: 1rem; max-height: 28rem; overflow: auto; font-size: 0.85rem; line-height: 1.45; }
+    #dl { margin-top: 0.75rem; }
+    #dl a { color: #2563eb; font-weight: 600; }
+    small { color: #666; }
+    .constraint-box {
+      margin: 0.75rem 0;
+      border: 1px solid #cfd3dc;
+      border-radius: 8px;
+      padding: 0.35rem 0.85rem 0.85rem;
+      background: #fafbfc;
+    }
+    .constraint-box > summary {
+      cursor: pointer;
+      font-weight: 600;
+      user-select: none;
+      list-style: none;
+      padding: 0.35rem 0;
+    }
+    .constraint-box > summary::-webkit-details-marker { display: none; }
+    .constraint-box > summary::after {
+      content: "（点击展开）";
+      font-weight: normal;
+      font-size: 0.82rem;
+      color: #666;
+      margin-left: 0.35rem;
+    }
+    .constraint-box[open] > summary::after { content: "（点击收起）"; }
+    .constraint-panel {
+      padding-top: 0.5rem;
+      border-top: 1px solid #e8eaef;
+      margin-top: 0.25rem;
+    }
+    .constraint-intro {
+      margin: 0 0 0.75rem;
+      font-size: 0.88rem;
+      color: #444;
+      line-height: 1.5;
+    }
+    .constraint-field { margin-bottom: 0.85rem; }
+    .constraint-field:last-child { margin-bottom: 0; }
+    .constraint-desc {
+      margin: 0.2rem 0 0.35rem;
+      font-size: 0.82rem;
+      color: #555;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <h1>人才-企业匹配</h1>
+
+  <form id="f">
+    <fieldset>
+      <div id="apiKeyRow">
+        <label for="apiKey">X-API-Key（应用访问口令，非 MiMo）</label>
+        <input id="apiKey" name="apiKey" type="password" autocomplete="off" placeholder="公网或经 IP 访问时填写，与服务器 APP_API_KEY 一致" />
+      </div>
+
+      <label for="file">简历文件</label>
+      <input id="file" name="file" type="file" accept=".pdf,.docx,.txt" required />
+
+      <label for="topK">召回企业数量</label>
+      <input id="topK" name="topK" type="number" min="1" max="200" value="15" />
+
+      <div class="row">
+        <label><input type="checkbox" id="useLlm" checked /> MiMo 生成报告正文</label>
+        <label><input type="checkbox" id="useLlmProfile" checked /> 人才画像</label>
+      </div>
+
+      <details class="constraint-box" id="constraintDetails">
+        <summary>匹配约束</summary>
+        <div class="constraint-panel">
+          <p class="constraint-intro">
+            以下为可选条件，用于在「宽召回 + 重排」阶段约束或加权企业列表；全部留空则完全依据简历与企业库自动匹配，与是否填写本区无关。
+          </p>
+
+          <div class="constraint-field">
+            <label for="prefProv">期望省份（逗号分隔）</label>
+            <p class="constraint-desc">
+              填写您希望企业所在的省级行政区，多个用英文或中文逗号分隔（如：江苏,浙江）。系统会把企业「省」字段与这里做模糊匹配，用于加分；若同时勾选「地域硬性过滤」，则只保留能匹配到此处所列省份的企业。
+            </p>
+            <input id="prefProv" type="text" placeholder="例：江苏,浙江" autocomplete="off" />
+          </div>
+
+          <div class="constraint-field">
+            <label for="prefCity">期望城市（逗号分隔）</label>
+            <p class="constraint-desc">
+              填写地级市或区县层级意向，多个用逗号分隔（如：苏州,无锡）。与企业的「市」「区/县」及所在地拼接文本比对，用于加分；勾选「地域硬性过滤」时，需至少满足您填写的省或市之一，否则该企业会被过滤掉。
+            </p>
+            <input id="prefCity" type="text" placeholder="例：苏州,无锡" autocomplete="off" />
+          </div>
+
+          <div class="constraint-field">
+            <label for="fieldKw">领域关键词（逗号分隔）</label>
+            <p class="constraint-desc">
+              填写您关心的技术或业务词，多个用逗号分隔。系统会在企业的「一级领域」「二级领域」「企业主要产品」中查找是否包含这些词，用于重排加分。勾选「领域硬性过滤」后，至少命中其中一个词的企业才会进入结果。
+            </p>
+            <input id="fieldKw" type="text" placeholder="例：半导体,封装" autocomplete="off" />
+          </div>
+
+          <div class="constraint-field">
+            <label for="excludeIds">排除企业 ID（逗号分隔）</label>
+            <p class="constraint-desc">
+              企业库 Excel 中每行对应的企业内部编号（与接口返回的 enterprise_id 一致）。填在此处的企业将不会出现在本次匹配结果中，适用于您已明确不考虑的单位。
+            </p>
+            <input id="excludeIds" type="text" placeholder="例：12,34" autocomplete="off" />
+          </div>
+
+          <div class="constraint-field">
+            <p class="constraint-desc" style="margin-top:0"><strong>地域硬性过滤</strong></p>
+            <p class="constraint-desc">
+              勾选后：必须满足您在「期望省份」或「期望城市」中至少一项与企业的所在地相符，否则直接剔除。若两处都留空，勾选也不会生效。适合「只考虑某省某市」的场景。
+            </p>
+            <div class="row">
+              <label><input type="checkbox" id="hardRegion" /> 启用地域硬性过滤</label>
+            </div>
+          </div>
+
+          <div class="constraint-field">
+            <p class="constraint-desc" style="margin-top:0"><strong>领域硬性过滤</strong></p>
+            <p class="constraint-desc">
+              勾选后：企业的领域/产品文本中必须出现您在「领域关键词」里填写的至少一个词，否则剔除。若关键词留空，勾选不会生效。适合「只看某类业务」的场景。
+            </p>
+            <div class="row">
+              <label><input type="checkbox" id="hardField" /> 启用领域硬性过滤</label>
+            </div>
+          </div>
+
+          <div class="constraint-field">
+            <label for="minRecall">最低召回分（0–100，可选）</label>
+            <p class="constraint-desc">
+              在重排之前，按检索阶段给出的原始匹配分（0–100）划线：低于该数值的企业不会进入后续重排与报告。留空表示使用服务器环境变量中的默认阈值（常为 0，即不额外过滤）。若填得过高，结果可能变少或为空。
+            </p>
+            <input id="minRecall" type="text" placeholder="例：30；留空表示不单独设置" autocomplete="off" />
+          </div>
+        </div>
+      </details>
+
+      <button type="submit" id="go">匹配</button>
+    </fieldset>
+  </form>
+
+  <div id="status"></div>
+  <section id="out" hidden>
+    <h2 style="font-size:1.05rem">报告预览</h2>
+    <pre id="report"></pre>
+    <div id="dl"></div>
+  </section>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const statusEl = $("status");
+    const out = $("out");
+    const reportEl = $("report");
+    const dlEl = $("dl");
+    let requireApiKey = true;
+
+    function setStatus(msg, err) {
+      statusEl.textContent = msg || "";
+      statusEl.classList.toggle("err", !!err);
+    }
+
+    function authHeaders() {
+      const h = {};
+      const key = $("apiKey").value.trim();
+      if (requireApiKey) {
+        if (!key) return null;
+        h["X-API-Key"] = key;
+      } else if (key) {
+        h["X-API-Key"] = key;
+      }
+      return h;
+    }
+
+    (async () => {
+      try {
+        const r = await fetch("/api/client-options");
+        const j = await r.json();
+        requireApiKey = !!j.require_api_key;
+        if (!requireApiKey) {
+          const row = $("apiKeyRow");
+          if (row) row.hidden = true;
+        }
+      } catch (_) {}
+    })();
+
+    $("f").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const headers = authHeaders();
+      if (headers === null) {
+        setStatus("请填写 X-API-Key（当前为公网或非本机访问）", true);
+        return;
+      }
+      const fileInput = $("file");
+      if (!fileInput.files || !fileInput.files[0]) {
+        setStatus("请选择文件", true);
+        return;
+      }
+
+      const fd = new FormData();
+      fd.append("file", fileInput.files[0]);
+      fd.append("top_k", String(parseInt($("topK").value, 10) || 15));
+      fd.append("use_llm", $("useLlm").checked ? "true" : "false");
+      fd.append("use_llm_for_profile", $("useLlmProfile").checked ? "true" : "false");
+      fd.append("preferred_provinces", ($("prefProv") && $("prefProv").value) || "");
+      fd.append("preferred_cities", ($("prefCity") && $("prefCity").value) || "");
+      fd.append("required_field_keywords", ($("fieldKw") && $("fieldKw").value) || "");
+      fd.append("exclude_enterprise_ids", ($("excludeIds") && $("excludeIds").value) || "");
+      fd.append("hard_region", $("hardRegion").checked ? "true" : "false");
+      fd.append("hard_field", $("hardField").checked ? "true" : "false");
+      fd.append("min_recall_score", ($("minRecall") && $("minRecall").value.trim()) || "");
+
+      $("go").disabled = true;
+      out.hidden = true;
+      reportEl.textContent = "";
+      setStatus("连接流式接口…");
+
+      const appendDownload = (sid, fname, note) => {
+        dlEl.innerHTML = "";
+        if (sid) {
+          const a = document.createElement("a");
+          a.href = "#";
+          a.textContent = "下载 Word：" + fname;
+          a.addEventListener("click", async (ev) => {
+            ev.preventDefault();
+            try {
+              const dh = authHeaders();
+              if (dh === null) {
+                alert("请填写 X-API-Key 后再下载");
+                return;
+              }
+              const dr = await fetch("/api/download/" + encodeURIComponent(sid), {
+                headers: dh,
+              });
+              if (!dr.ok) {
+                const t = await dr.text();
+                throw new Error(t || dr.statusText);
+              }
+              const blob = await dr.blob();
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = fname;
+              link.click();
+              URL.revokeObjectURL(url);
+            } catch (err) {
+              alert("下载失败：" + (err && err.message ? err.message : err));
+            }
+          });
+          dlEl.appendChild(a);
+        }
+        if (note) {
+          const n = document.createElement("p");
+          const s = document.createElement("small");
+          s.textContent = note;
+          n.appendChild(s);
+          dlEl.appendChild(n);
+        }
+      };
+
+      try {
+        const res = await fetch("/api/match/stream", {
+          method: "POST",
+          headers,
+          body: fd,
+        });
+        if (!res.ok) {
+          const t = await res.text();
+          let msg = res.statusText;
+          try {
+            const j = JSON.parse(t);
+            const d = j.detail;
+            msg = typeof d === "string" ? d : msg;
+          } catch (_) {
+            if (t) msg = t;
+          }
+          throw new Error(msg || "请求失败");
+        }
+        const reader = res.body.getReader();
+        const dec = new TextDecoder("utf-8");
+        let buf = "";
+        let reportBuf = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const parts = buf.split("\n\n");
+          buf = parts.pop() || "";
+          for (const block of parts) {
+            const lines = block.split("\n");
+            for (const ln of lines) {
+              if (!ln.startsWith("data:")) continue;
+              const raw = ln.replace(/^data:\s*/, "").trim();
+              let ev;
+              try {
+                ev = JSON.parse(raw);
+              } catch (_) {
+                continue;
+              }
+              if (ev.type === "stage") {
+                if (ev.name === "search_done" && ev.recall_pool_size != null) {
+                  setStatus(
+                    "检索完成：输出 " +
+                      (ev.enterprise_count ?? "?") +
+                      " 家，宽召回池 " +
+                      ev.recall_pool_size +
+                      " 条"
+                  );
+                } else {
+                  setStatus("阶段：" + (ev.name || ""));
+                }
+              } else if (ev.type === "token" && ev.delta) {
+                if (ev.section === "profile") {
+                  setStatus("生成人才画像…");
+                } else if (ev.section === "report") {
+                  setStatus("生成报告…");
+                }
+                reportBuf += ev.delta;
+                reportEl.textContent = reportBuf;
+              } else if (ev.type === "warning") {
+                setStatus("警告：" + (ev.message || ""), false);
+              } else if (ev.type === "error") {
+                throw new Error(ev.message || "流式错误");
+              } else if (ev.type === "done") {
+                if (ev.report_text) reportEl.textContent = ev.report_text;
+                appendDownload(ev.download_id, ev.word_path || "report.docx", ev.download_note);
+                setStatus("完成。");
+              }
+            }
+          }
+        }
+        out.hidden = false;
+      } catch (err) {
+        setStatus(err.message || String(err), true);
+      } finally {
+        $("go").disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
